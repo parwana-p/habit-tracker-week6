@@ -90,6 +90,11 @@ def list_checkins(habit_id: int):
     return [r["day"] for r in rows]
 
 
+def _today() -> date:
+    """Current date; a separate function so tests can replace the clock."""
+    return date.today()
+
+
 @app.get("/habits/{habit_id}/streak")
 def get_streak(habit_id: int):
     with closing(get_db()) as conn:
@@ -109,7 +114,7 @@ def get_streak(habit_id: int):
             continue  # ignore malformed legacy rows instead of failing with a 500
 
     streak = 0
-    current = date.today()
+    current = _today()
     while current in checkin_dates:
         streak += 1
         current -= timedelta(days=1)
