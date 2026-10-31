@@ -1,4 +1,4 @@
-"""Habit Tracker — starter app for Week 6.
+﻿"""Habit Tracker — starter app for Week 6.
 
 A tiny FastAPI service for habits and daily check-ins. You'll add features on
 branches, open PRs, and compare your manual review with an AI reviewer.
@@ -12,6 +12,7 @@ Test:
 
 import sqlite3
 from contextlib import closing
+from datetime import date, timedelta
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -87,3 +88,25 @@ def list_checkins(habit_id: int):
             "SELECT day FROM checkins WHERE habit_id = ? ORDER BY day", (habit_id,)
         ).fetchall()
     return [r["day"] for r in rows]
+
+
+@app.get("/habits/{habit_id}/streak")
+def get_streak(habit_id: int):
+    with closing(get_db()) as conn:
+        habit = conn.execute("SELECT id FROM habits WHERE id = ?", (habit_id,)).fetchone()
+        if habit is None:
+            raise HTTPException(status_code=404, detail="unknown habit")
+        rows = conn.execute(
+            "SELECT DISTINCT day FROM checkins WHERE habit_id = ? ORDER BY day DESC",
+            (habit_id,),
+        ).fetchall()
+
+    checkin_dates = {date.fromisoformat(r["day"]) for r in rows}
+
+    streak = 0
+    current = date.today()
+    while current in checkin_dates:
+        streak += 1
+        current -= timedelta(days=1)
+
+    return {"habit_id": habit_id, "streak": streak}
