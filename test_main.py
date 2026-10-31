@@ -78,3 +78,25 @@ def test_checkin_valid_day_accepted():
     r = client.post(f"/habits/{hid}/checkin", json={"day": "2026-10-01"})
     assert r.status_code == 200
     assert r.json()["day"] == "2026-10-01"
+
+
+def test_create_habit_name_is_trimmed():
+    """Surrounding whitespace is removed before the name is stored."""
+    r = client.post("/habits", json={"name": "  Read  "})
+    assert r.status_code == 200
+    assert r.json()["name"] == "Read"
+
+
+def test_checkin_impossible_date_rejected():
+    """A correctly shaped but non-existent date (Feb 30) must return 422."""
+    hid = client.post("/habits", json={"name": "Swim"}).json()["id"]
+    r = client.post(f"/habits/{hid}/checkin", json={"day": "2026-02-30"})
+    assert r.status_code == 422
+    assert "YYYY-MM-DD" in r.json()["detail"][0]["msg"]
+
+
+def test_checkin_compact_iso_date_rejected():
+    """Python accepts "20260922" as ISO, but the API must require YYYY-MM-DD."""
+    hid = client.post("/habits", json={"name": "Journal"}).json()["id"]
+    r = client.post(f"/habits/{hid}/checkin", json={"day": "20260922"})
+    assert r.status_code == 422
