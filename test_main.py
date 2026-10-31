@@ -1,4 +1,4 @@
-﻿from datetime import date, timedelta
+from datetime import date, timedelta
 
 from fastapi.testclient import TestClient
 
@@ -100,3 +100,13 @@ def test_streak_duplicate_checkins_not_double_counted():
     r = client.get(f"/habits/{hid}/streak")
     assert r.status_code == 200
     assert r.json() == {"habit_id": hid, "streak": 2}
+
+
+def test_streak_ignores_malformed_stored_day():
+    """A bad 'day' already in the DB must not crash the streak endpoint."""
+    hid = client.post("/habits", json={"name": "Messy data"}).json()["id"]
+    client.post(f"/habits/{hid}/checkin", json={"day": date.today().isoformat()})
+    client.post(f"/habits/{hid}/checkin", json={"day": "not-a-date"})
+    r = client.get(f"/habits/{hid}/streak")
+    assert r.status_code == 200
+    assert r.json() == {"habit_id": hid, "streak": 1}

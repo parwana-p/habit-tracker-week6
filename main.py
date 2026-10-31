@@ -1,4 +1,4 @@
-﻿"""Habit Tracker — starter app for Week 6.
+"""Habit Tracker — starter app for Week 6.
 
 A tiny FastAPI service for habits and daily check-ins. You'll add features on
 branches, open PRs, and compare your manual review with an AI reviewer.
@@ -97,11 +97,16 @@ def get_streak(habit_id: int):
         if habit is None:
             raise HTTPException(status_code=404, detail="unknown habit")
         rows = conn.execute(
-            "SELECT DISTINCT day FROM checkins WHERE habit_id = ? ORDER BY day DESC",
+            "SELECT DISTINCT day FROM checkins WHERE habit_id = ?",
             (habit_id,),
         ).fetchall()
 
-    checkin_dates = {date.fromisoformat(r["day"]) for r in rows}
+    checkin_dates = set()
+    for r in rows:
+        try:
+            checkin_dates.add(date.fromisoformat(r["day"]))
+        except ValueError:
+            continue  # ignore malformed legacy rows instead of failing with a 500
 
     streak = 0
     current = date.today()
