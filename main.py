@@ -10,14 +10,17 @@ Test:
     pytest
 """
 
+import re
 import sqlite3
 from contextlib import closing
+from datetime import date
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 DB_PATH = Path(__file__).parent / "habits.db"
+ISO_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 app = FastAPI(title="Habit Tracker")
 
@@ -49,9 +52,30 @@ init_db()
 class HabitIn(BaseModel):
     name: str
 
+    @field_validator("name")
+    @classmethod
+    def name_must_not_be_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("habit name must not be empty or whitespace-only")
+        return v.strip()
+
 
 class CheckinIn(BaseModel):
     day: str  # ISO date, e.g. "2026-09-22"
+
+    @field_validator("day")
+    @classmethod
+    def day_must_be_valid_date(cls, v: str) -> str:
+        # fromisoformat also accepts "20260922" and week dates on Python 3.11+,
+        # so require the exact YYYY-MM-DD shape first.
+        error = f"'{v}' is not a valid date; expected format YYYY-MM-DD"
+        if not ISO_DAY.fullmatch(v):
+            raise ValueError(error)
+        try:
+            date.fromisoformat(v)
+        except ValueError as err:
+            raise ValueError(error) from err
+        return v
 
 
 @app.post("/habits")
