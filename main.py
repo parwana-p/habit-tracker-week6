@@ -12,6 +12,7 @@ Test:
 
 import sqlite3
 from contextlib import closing
+from datetime import date, timedelta
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -87,3 +88,35 @@ def list_checkins(habit_id: int):
             "SELECT day FROM checkins WHERE habit_id = ? ORDER BY day", (habit_id,)
         ).fetchall()
     return [r["day"] for r in rows]
+
+
+def _today() -> date:
+    """Current date; a separate function so tests can replace the clock."""
+    return date.today()
+
+
+@app.get("/habits/{habit_id}/streak")
+def get_streak(habit_id: int):
+    with closing(get_db()) as conn:
+        habit = conn.execute("SELECT id FROM habits WHERE id = ?", (habit_id,)).fetchone()
+        if habit is None:
+            raise HTTPException(status_code=404, detail="unknown habit")
+        rows = conn.execute(
+            "SELECT DISTINCT day FROM checkins WHERE habit_id = ?",
+            (habit_id,),
+        ).fetchall()
+
+    checkin_dates = set()
+    for r in rows:
+        try:
+            checkin_dates.add(date.fromisoformat(r["day"]))
+        except ValueError:
+            continue  # ignore malformed legacy rows instead of failing with a 500
+
+    streak = 0
+    current = _today()
+    while current in checkin_dates:
+        streak += 1
+        current -= timedelta(days=1)
+
+    return {"habit_id": habit_id, "streak": streak}
